@@ -116,3 +116,4 @@ dmypy.json
 # default
 data/*
 log/*
+example_data/*
