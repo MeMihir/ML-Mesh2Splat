@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pointnet2_utils import PointNetSetAbstraction,PointNetFeaturePropagation
+from .pointnet2_utils import PointNetSetAbstraction,PointNetFeaturePropagation
 
 
 class Mesh2Splat(nn.Module):
@@ -36,20 +36,35 @@ class Mesh2Splat(nn.Module):
 
         x = self.drop1(F.relu(self.bn1(self.conv1(l0_points))))
         x = self.conv2(x)
-        x = F.log_softmax(x, dim=1)
-        x = x.permute(0, 2, 1)
         return x, l4_points
 
 
-class get_loss(nn.Module):
-    def __init__(self):
-        super(get_loss, self).__init__()
-    def forward(self, pred, target, trans_feat, weight):
-        total_loss = F.nll_loss(pred, target, weight=weight)
+class GaussianSplatLoss(nn.Module):
+    def __init__(self, position_weight=1.0, scaling_weight=1.0, rotation_weight=1.0, opacity_weight=1.0, color_weight=1.0):
+        super(GaussianSplatLoss, self).__init__()
+        self.position_weight = position_weight
+        self.scaling_weight = scaling_weight
+        self.rotation_weight = rotation_weight
+        self.opacity_weight = opacity_weight
+        self.color_weight = color_weight
 
+    def forward(self, pred, target):
+        # print('Loss pred shape: ', pred.shape)
+        # print('Loss target shape: ', target.shape)
+        position_loss = F.mse_loss(pred[:,:3], target[:,:3])
+        scaling_loss = F.mse_loss(pred[:,10:13], target[:,10:13])
+        rotation_loss = F.cross_entropy(pred[:,13:], target[:,13:])
+        opacity_loss = F.mse_loss(pred[:,9], target[:,9])
+        color_loss = F.mse_loss(pred[:,6:9], target[:,6:9])
+
+        total_loss = position_loss * self.position_weight + \
+                        scaling_loss * self.scaling_weight + \
+                        rotation_loss * self.rotation_weight + \
+                        opacity_loss * self.opacity_weight + \
+                        color_loss * self.color_weight
         return total_loss
 
 if __name__ == '__main__':
     model = Mesh2Splat(13)
     xyz = torch.rand(6, 9, 2048)
-    (model(xyz))
+    print(model(xyz)[0].shape)
