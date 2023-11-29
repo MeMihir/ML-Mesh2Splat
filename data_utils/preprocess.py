@@ -3,7 +3,7 @@ import glob
 import numpy as np
 from plyfile import PlyData, PlyElement
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = './'
 input_path = os.path.join(BASE_DIR, 'data', 'input')
 truth_path = os.path.join(BASE_DIR, 'data', 'truth')
 preprop_path = os.path.join(BASE_DIR, 'data', 'preprocessed')
