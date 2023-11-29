@@ -114,8 +114,8 @@ def main(args):
     #         torch.nn.init.constant_(m.bias.data, 0.0)
 
     try:
-        checkpoint = torch.load(checkpoints_dir)
-        # start_epoch = checkpoint['epoch']
+        checkpoint = torch.load(os.path.join(checkpoints_dir, 'model.pth'))
+        start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model_state_dict'])
         log_string('Use pretrain model')
     except:
