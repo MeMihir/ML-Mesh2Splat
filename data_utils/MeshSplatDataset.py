@@ -1,11 +1,12 @@
 import os
 import numpy as np
 
+import torch
 from tqdm import tqdm
 from torch.utils.data import Dataset
 
 class MeshSplatDataset(Dataset):
-    def __init__(self, root, split='train', num_points=1024, block_size=1.0, sample_rate=1.0, transform=None):
+    def __init__(self, root, split='train', num_points=1024, block_size=1.0, sample_rate=1.0, transform=None, device='cuda:0'):
         super().__init__()
         self.root = root
         self.split = split
@@ -13,8 +14,10 @@ class MeshSplatDataset(Dataset):
         self.block_size = block_size
         self.sample_rate = sample_rate
         self.transform = transform
+        self.device = device
         self.points = []
         self.splats = []
+        
 
         if self.split == 'train':
             self.files = [fil.split('.')[0] for fil in os.listdir(os.path.join(self.root, 'train')) if not fil.endswith('_splat.npy')]
@@ -25,15 +28,22 @@ class MeshSplatDataset(Dataset):
         
         for filename in self.files:
             points = np.load(os.path.join(self.root, self.split, filename+'.npy'))
-            self.points.append(points)
             splats = np.load(os.path.join(self.root, self.split, filename+'_splat.npy'))
-            self.splats.append(splats)
+
+            max_pts = np.amax(points[:, :3], axis=0)
+            current_points = np.zeros((points.shape[0], 9))  # num_point * 9
+            current_points[:, :6] = points
+            current_points[:, 6:] = points[:, :3]/max_pts
+            current_points[:, 3:6] /= 255.0
+            
+            self.points.append(current_points.transpose(1, 0))
+            self.splats.append(splats.transpose(1, 0))
         
         print('The size of %s data is %d' % (self.split, len(self.points)))
     
     def __getitem__(self, index):
-        points = self.points[index]
-        splats = self.splats[index]
+        points = torch.Tensor(self.points[index]).to(self.device)
+        splats = torch.Tensor(self.splats[index]).to(self.device)
         if self.transform is not None:
             points, splats = self.transform(points, splats)
         return points, splats
