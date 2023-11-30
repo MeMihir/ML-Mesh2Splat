@@ -53,15 +53,11 @@ class GaussianSplatLoss(nn.Module):
         # print('Loss target shape: ', target.shape)
         position_loss = F.mse_loss(pred[:,:3], target[:,:3])
         scaling_loss = F.mse_loss(pred[:,10:13], target[:,10:13])
-        rotation_loss = F.cross_entropy(pred[:,13:], target[:,13:])
+        rotation_loss = F.mse_loss(pred[:,13:], target[:,13:])
         opacity_loss = F.mse_loss(pred[:,9], target[:,9])
         color_loss = F.mse_loss(pred[:,6:9], target[:,6:9])
 
-        total_loss = position_loss * self.position_weight + \
-                        scaling_loss * self.scaling_weight + \
-                        rotation_loss * self.rotation_weight + \
-                        opacity_loss * self.opacity_weight + \
-                        color_loss * self.color_weight
+        total_loss = position_loss * self.position_weight + scaling_loss * self.scaling_weight + rotation_loss * self.rotation_weight + opacity_loss * self.opacity_weight + color_loss * self.color_weight
         return total_loss
 
 if __name__ == '__main__':

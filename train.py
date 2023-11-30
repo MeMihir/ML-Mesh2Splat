@@ -138,11 +138,13 @@ def main(args):
     #         torch.nn.init.constant_(m.bias.data, 0.0)
 
     try:
-        checkpoint = torch.load(os.path.join(checkpoints_dir, args.model + '.pth'))
+        print(os.path.join(checkpoints_dir, args.model + '.pth'))
+        checkpoint = torch.load(os.path.join(checkpoints_dir, args.model + '.pth'), map_location=device)
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model_state_dict'])
         log_string('Use pretrain model')
-    except:
+    except Exception as e:
+        print(e)
         log_string('No existing model, starting training from scratch...')
         start_epoch = 0
         # classifier = classifier.apply(weights_init)
@@ -210,8 +212,9 @@ def main(args):
                 print("Logging to wandb")
                 wandb.log({
                     "lr": optimizer.param_groups[0]["lr"], 
-                    "mean_loss": (loss_sum / num_batches)},
-                    commit=True
+                    "mean_loss": (loss_sum / num_batches),
+                    "loss": loss
+                    },commit=True
                 )
         log_string('Training mean loss: %f' % (loss_sum / num_batches))
         # log_string('Training accuracy: %f' % (total_correct / float(total_seen)))
