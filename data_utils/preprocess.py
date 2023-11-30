@@ -2,13 +2,14 @@ import os
 import glob
 import numpy as np
 from plyfile import PlyData, PlyElement
+from .downsampling import everyNth
 
 BASE_DIR = './'
 input_path = os.path.join(BASE_DIR, 'data', 'input')
 truth_path = os.path.join(BASE_DIR, 'data', 'truth')
 preprop_path = os.path.join(BASE_DIR, 'data', 'preprocessed')
 
-def collect_point_label(in_filename, truth_filename, out_filename, split='train' ,file_format='numpy'):
+def collect_point_label(in_filename, truth_filename, out_filename, split='train' ,file_format='numpy', npoints=4096):
     """ preprocess point and splats
         points: N*6, each row is x,y,z,r,g,b
         splats: N*17, each row is x,y,z,normal_x,normal_y,normal_z,color_r,color_g,color_b,opacity,scale_x,scale_y,scale_z,rotation_1,rotation_2,rotation_3,rotation_4
@@ -27,8 +28,10 @@ def collect_point_label(in_filename, truth_filename, out_filename, split='train'
         plydata = PlyData.read(f)
         splat = np.array(list(map(list, plydata.elements[0])))
 
+    points = everyNth(points, npoints)
     points_min = np.amin(points, axis=0)[0:3]
     points[:, 0:3] -= points_min
+    splat = everyNth(splat, npoints)
     
     if file_format=='numpy':
         np.save(os.path.join(preprop_path, split, out_filename)+'.npy', points)
@@ -48,7 +51,7 @@ def data_to_obj(data,name='example.obj',no_wall=True):
                    (data[i, 0], data[i, 1], data[i, 2], data[i, 3], data[i, 4], data[i, 5]))
     fout.close()
 
-def preprocess_data(split_ratio=0.9):
+def preprocess_data(split_ratio=0.9, num_point=4096):
     filenames = [os.path.splitext(filename)[0] for filename in os.listdir(input_path)]
     np.random.shuffle(filenames)
     train_files = filenames[:int(len(filenames)*split_ratio)]
@@ -59,7 +62,7 @@ def preprocess_data(split_ratio=0.9):
             in_filename = filename+'.txt' # anya.txt
             true_filename = filename+'.ply' # anya.ply
 
-            collect_point_label(in_filename, true_filename, out_filename, 'train', 'numpy')
+            collect_point_label(in_filename, true_filename, out_filename, 'train', 'numpy', npoints=num_point)
         except Exception as e:
             print(filename, 'ERROR!!')
             print(e)
@@ -70,7 +73,7 @@ def preprocess_data(split_ratio=0.9):
             in_filename = filename+'.txt' # anya.txt
             true_filename = filename+'.ply' # anya.ply
 
-            collect_point_label(in_filename, true_filename, out_filename, 'test', 'numpy')
+            collect_point_label(in_filename, true_filename, out_filename, 'test', 'numpy', npoints=num_point)
         except:
             print(filename, 'ERROR!!')
 

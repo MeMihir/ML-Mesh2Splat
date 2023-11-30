@@ -107,7 +107,7 @@ def main(args):
     BATCH_SIZE = args.batch_size
 
     print('preprocess data ...')
-    preprocess.preprocess_data(1)
+    preprocess.preprocess_data(1, args.npoint)
     print("start loading training data ...")
     TRAIN_DATASET = MeshSplatDataset(split='train', root=root, num_points=NUM_POINT, block_size=1.0, sample_rate=1.0, transform=None, device=device)
     print("start loading test data ...")
