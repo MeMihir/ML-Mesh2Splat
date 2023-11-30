@@ -117,3 +117,5 @@ dmypy.json
 data/*
 log/*
 example_data/*
+wandb/
+.DS_Store

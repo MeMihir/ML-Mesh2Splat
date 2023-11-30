@@ -12,6 +12,7 @@ import importlib
 import shutil
 from tqdm import tqdm
 import numpy as np
+import wandb
 import time
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -25,7 +26,8 @@ def inplace_relu(m):
 
 def parse_args():
     parser = argparse.ArgumentParser('Model')
-    parser.add_argument('--model', type=str, default='mesh2splat', help='model name [default: mesh2splat]')
+    parser.add_argument('--model', type=str, default='pointnet2', help='model name [default: pointnet2]')
+    parser.add_argument("--run_name", type=str, default="train-my-gpt4", help="used to name saving directory and wandb run")
     parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
     parser.add_argument('--epoch', default=32, type=int, help='Epoch to run [default: 32]')
     parser.add_argument('--learning_rate', default=0.001, type=float, help='Initial learning rate [default: 0.001]')
@@ -33,15 +35,37 @@ def parse_args():
     parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
-    parser.add_argument('--npoint', type=int, default=4096, help='Point Number [default: 4096]')
+    parser.add_argument('--npoint', type=int, default=16384, help='Point Number [default: 16384]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
     parser.add_argument('--lr_decay', type=float, default=0.7, help='Decay rate for lr decay [default: 0.7]')
-    parser.add_argument('--test_area', type=int, default=5, help='Which area to use for test, option: 1-6 [default: 5]')
+    parser.add_argument("--offline", action="store_true")
+    parser.add_argument("--report_to_wandb", default=False, action="store_true")
+    parser.add_argument("--wandb_project", type=str)
+    parser.add_argument("--wandb_entity", type=str)
+    parser.add_argument( "--save_checkpoints_to_wandb", default=False, action="store_true", help="save checkpoints to wandb")
 
     return parser.parse_args()
 
 
 def main(args):
+    if args.save_checkpoints_to_wandb and not args.report_to_wandb:
+        raise ValueError("save_checkpoints_to_wandb requires report_to_wandb")
+
+    if args.offline:
+        os.environ["WANDB_MODE"] = "offline"
+        os.environ["TRANSFORMERS_OFFLINE"] = "1"
+
+    if args.report_to_wandb:
+        wandb.init(
+            project=args.wandb_project,
+            entity=args.wandb_entity,
+            name=args.run_name,
+            config=vars(args),
+        )
+
+    if not os.path.exists(args.run_name):
+        os.makedirs(args.run_name)
+
     def log_string(str):
         logger.info(str)
         print(str)
@@ -114,7 +138,7 @@ def main(args):
     #         torch.nn.init.constant_(m.bias.data, 0.0)
 
     try:
-        checkpoint = torch.load(os.path.join(checkpoints_dir, 'model.pth'))
+        checkpoint = torch.load(os.path.join(checkpoints_dir, args.model + '.pth'))
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['model_state_dict'])
         log_string('Use pretrain model')
@@ -181,13 +205,21 @@ def main(args):
             # total_correct += correct
             total_seen += (BATCH_SIZE * NUM_POINT)
             loss_sum += loss
+
+            if args.report_to_wandb: 
+                print("Logging to wandb")
+                wandb.log({
+                    "lr": optimizer.param_groups[0]["lr"], 
+                    "mean_loss": (loss_sum / num_batches)},
+                    commit=True
+                )
         log_string('Training mean loss: %f' % (loss_sum / num_batches))
         # log_string('Training accuracy: %f' % (total_correct / float(total_seen)))
 
         if epoch % 5 == 0:
-            logger.info('Save model...')
-            savepath = str(checkpoints_dir) + '/model.pth'
-            log_string('Saving at %s' % savepath)
+            logger.info(f"Saving checkpoint to {args.run_name}/checkpoint_{epoch}.pt")
+            savepath = f"{args.run_name}/checkpoint_{epoch}.pt"
+            log_string(f"Saving checkpoint to {args.run_name}/checkpoint_{epoch}.pt")
             state = {
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
@@ -196,77 +228,8 @@ def main(args):
             torch.save(state, savepath)
             log_string('Saving model....')
 
-        '''Evaluate on chopped scenes'''
-        # with torch.no_grad():
-        #     num_batches = len(testDataLoader)
-        #     total_correct = 0
-        #     total_seen = 0
-        #     loss_sum = 0
-        #     labelweights = np.zeros(NUM_CLASSES)
-        #     total_seen_class = [0 for _ in range(NUM_CLASSES)]
-        #     total_correct_class = [0 for _ in range(NUM_CLASSES)]
-        #     total_iou_deno_class = [0 for _ in range(NUM_CLASSES)]
-        #     classifier = classifier.eval()
-
-        #     log_string('---- EPOCH %03d EVALUATION ----' % (global_epoch + 1))
-        #     for i, (points, target) in tqdm(enumerate(testDataLoader), total=len(testDataLoader), smoothing=0.9):
-        #         points = points.data.numpy()
-        #         points = torch.Tensor(points)
-        #         points, target = points.float().cuda(), target.long().cuda()
-        #         points = points.transpose(2, 1)
-
-        #         seg_pred, trans_feat = classifier(points)
-        #         pred_val = seg_pred.contiguous().cpu().data.numpy()
-        #         seg_pred = seg_pred.contiguous().view(-1, NUM_CLASSES)
-
-        #         batch_label = target.cpu().data.numpy()
-        #         target = target.view(-1, 1)[:, 0]
-        #         loss = criterion(seg_pred, target, trans_feat, weights)
-        #         loss_sum += loss
-        #         pred_val = np.argmax(pred_val, 2)
-        #         correct = np.sum((pred_val == batch_label))
-        #         total_correct += correct
-        #         total_seen += (BATCH_SIZE * NUM_POINT)
-        #         tmp, _ = np.histogram(batch_label, range(NUM_CLASSES + 1))
-        #         labelweights += tmp
-
-        #         for l in range(NUM_CLASSES):
-        #             total_seen_class[l] += np.sum((batch_label == l))
-        #             total_correct_class[l] += np.sum((pred_val == l) & (batch_label == l))
-        #             total_iou_deno_class[l] += np.sum(((pred_val == l) | (batch_label == l)))
-
-        #     labelweights = labelweights.astype(np.float32) / np.sum(labelweights.astype(np.float32))
-        #     mIoU = np.mean(np.array(total_correct_class) / (np.array(total_iou_deno_class, dtype=np.float) + 1e-6))
-        #     log_string('eval mean loss: %f' % (loss_sum / float(num_batches)))
-        #     log_string('eval point avg class IoU: %f' % (mIoU))
-        #     log_string('eval point accuracy: %f' % (total_correct / float(total_seen)))
-        #     log_string('eval point avg class acc: %f' % (
-        #         np.mean(np.array(total_correct_class) / (np.array(total_seen_class, dtype=np.float) + 1e-6))))
-
-        #     iou_per_class_str = '------- IoU --------\n'
-        #     for l in range(NUM_CLASSES):
-        #         iou_per_class_str += 'class %s weight: %.3f, IoU: %.3f \n' % (
-        #             seg_label_to_cat[l] + ' ' * (14 - len(seg_label_to_cat[l])), labelweights[l - 1],
-        #             total_correct_class[l] / float(total_iou_deno_class[l]))
-
-        #     log_string(iou_per_class_str)
-        #     log_string('Eval mean loss: %f' % (loss_sum / num_batches))
-        #     log_string('Eval accuracy: %f' % (total_correct / float(total_seen)))
-
-        #     if mIoU >= best_iou:
-        #         best_iou = mIoU
-        #         logger.info('Save model...')
-        #         savepath = str(checkpoints_dir) + '/best_model.pth'
-        #         log_string('Saving at %s' % savepath)
-        #         state = {
-        #             'epoch': epoch,
-        #             'class_avg_iou': mIoU,
-        #             'model_state_dict': classifier.state_dict(),
-        #             'optimizer_state_dict': optimizer.state_dict(),
-        #         }
-        #         torch.save(state, savepath)
-        #         log_string('Saving model....')
-        #     log_string('Best mIoU: %f' % best_iou)
+            if args.report_to_wandb and args.save_checkpoints_to_wandb:
+                wandb.save(f"{args.run_name}/checkpoint_{epoch}.pt")
         global_epoch += 1
 
 
