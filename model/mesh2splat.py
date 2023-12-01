@@ -18,7 +18,7 @@ class Mesh2Splat(nn.Module):
         self.conv1 = nn.Conv1d(128, 128, 1)
         self.bn1 = nn.BatchNorm1d(128)
         self.drop1 = nn.Dropout(0.5)
-        self.conv2 = nn.Conv1d(128, points_dim, 1)
+        self.convOut = nn.Conv1d(128, points_dim, 1)
 
     def forward(self, xyz):
         l0_points = xyz
@@ -35,7 +35,7 @@ class Mesh2Splat(nn.Module):
         l0_points = self.fp1(l0_xyz, l1_xyz, None, l1_points)
 
         x = self.drop1(F.relu(self.bn1(self.conv1(l0_points))))
-        x = self.conv2(x)
+        x = self.convOut(x)
         return x, l4_points
 
 

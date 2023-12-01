@@ -144,7 +144,7 @@ def main(args):
         print(os.path.join(checkpoints_dir, args.model + '.pth'))
         checkpoint = torch.load(os.path.join(checkpoints_dir, args.model + '.pth'), map_location=device)
         start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict'], strict=False)
         log_string('Use pretrain model')
     except Exception as e:
         print(e)
