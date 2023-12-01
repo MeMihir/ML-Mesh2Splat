@@ -1,7 +1,7 @@
 import argparse
 import os
 from data_utils.MeshSplatDataset import MeshSplatDataset
-from data_utils import preprocess
+from data_utils import preprocess, postprocessing
 from model.mesh2splat import Mesh2Splat, GaussianSplatLoss
 import torch
 import datetime
@@ -235,6 +235,11 @@ def main(args):
                 wandb.save(f"{args.run_name}/checkpoint_{epoch}.pt")
         global_epoch += 1
 
+    # Get output
+    model = model.eval()
+    for i, (points, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
+        pred, _ = model(points)
+        postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i) + '.ply'))
 
 if __name__ == '__main__':
     args = parse_args()
