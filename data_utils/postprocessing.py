@@ -2,7 +2,8 @@ import numpy as np
 from plyfile import PlyData, PlyElement
 
 def save_numpy_array_to_ply(numpy_array, file_path):
-    num_vertices = numpy_array.shape[0]
+    num_vertices = numpy_array.shape[1]
+    numpy_array = numpy_array.reshape(num_vertices, 17)
 
     # Define the structured array with field names and data types
     dtype = np.dtype([

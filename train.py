@@ -34,6 +34,7 @@ def parse_args():
     parser.add_argument('--device', type=str, default=None, help='GPU to use [default: none]')
     parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
+    parser.add_argument('--output_dir', type=str, default='./data/output', help='Log path [default: None]')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
     parser.add_argument('--npoint', type=int, default=16384, help='Point Number [default: 16384]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
@@ -88,6 +89,8 @@ def main(args):
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(exist_ok=True)
 
     '''LOG'''
     args = parse_args()
@@ -124,7 +127,7 @@ def main(args):
     # shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     # shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
 
-    model = Mesh2Splat(17)
+    model = Mesh2Splat(17).to(device)
     criterion = GaussianSplatLoss()
     # classifier.apply(inplace_relu)
 
@@ -194,6 +197,8 @@ def main(args):
             optimizer.zero_grad()
 
             # points = points.transpose(2, 1)
+            points = torch.Tensor(points).float().to(device)
+            target = torch.Tensor(target).float().to(device)
 
             pred, _ = model(points)
             pred = pred.reshape(-1, 17)
@@ -209,7 +214,6 @@ def main(args):
             loss_sum += loss
 
             if args.report_to_wandb: 
-                print("Logging to wandb")
                 wandb.log({
                     "lr": optimizer.param_groups[0]["lr"], 
                     "mean_loss": (loss_sum / num_batches),
@@ -238,8 +242,10 @@ def main(args):
     # Get output
     model = model.eval()
     for i, (points, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
-        pred, _ = model(points)
-        postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i) + '.ply'))
+        preds, _ = model(points)
+        preds = preds.cpu().detach().numpy()
+        for pred in preds:
+            postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i) + '.ply'))
 
 if __name__ == '__main__':
     args = parse_args()
