@@ -203,7 +203,7 @@ def main(args):
             pred, _ = model(points)
             pred = pred.reshape(-1, 17)
             target = target.reshape(-1, 17)
-            loss = criterion(pred, target)
+            loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss = criterion(pred, target)
             loss.backward()
             optimizer.step()
 
@@ -216,11 +216,16 @@ def main(args):
             if args.report_to_wandb: 
                 wandb.log({
                     "lr": optimizer.param_groups[0]["lr"], 
-                    "mean_loss": (loss_sum / num_batches),
-                    "loss": loss
+                    "loss": loss,
+                    "position_loss": position_loss,
+                    "scaling_loss": scaling_loss,
+                    "rotation_loss": rotation_loss,
+                    "opacity_loss": opacity_loss,
+                    "color_loss": color_loss,
                     },commit=True
                 )
         log_string('Training mean loss: %f' % (loss_sum / num_batches))
+        log_string('Training loss: %f' % loss)
         # log_string('Training accuracy: %f' % (total_correct / float(total_seen)))
 
         if epoch % 5 == 0:
