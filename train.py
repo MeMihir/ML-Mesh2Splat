@@ -239,9 +239,13 @@ def main(args):
                 wandb.save(f"{args.run_name}/checkpoint_{epoch}.pt")
         global_epoch += 1
 
+    if args.report_to_wandb and args.save_checkpoints_to_wandb:
+        wandb.save(f"{args.run_name}/checkpoint_{args.epoch}.pt")
+
     # Get output
     model = model.eval()
     for i, (points, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
+        points = torch.Tensor(points).float().to(device)
         preds, _ = model(points)
         preds = preds.cpu().detach().numpy()
         for pred in preds:
