@@ -1,8 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from pytorch3d.loss import chamfer_distance
 from .pointnet2_utils import PointNetSetAbstraction,PointNetFeaturePropagation
 
+
+loss_functions = {
+    'mse': F.mse_loss,
+    'chamfer': chamfer_distance,
+}
 
 class Mesh2Splat(nn.Module):
     def __init__(self, points_dim):
@@ -19,6 +25,13 @@ class Mesh2Splat(nn.Module):
         self.bn1 = nn.BatchNorm1d(128)
         self.drop1 = nn.Dropout(0.5)
         self.convOut = nn.Conv1d(128, points_dim, 1)
+        
+        self._freeze_layers()
+
+    def _freeze_layers(self):
+        for name, param in self.named_parameters():
+            if 'convOut' not in name:  # Exclude parameters from the last layer
+                param.requires_grad = False
 
     def forward(self, xyz):
         l0_points = xyz
@@ -40,22 +53,29 @@ class Mesh2Splat(nn.Module):
 
 
 class GaussianSplatLoss(nn.Module):
-    def __init__(self, position_weight=1.0, scaling_weight=1.0, rotation_weight=1.0, opacity_weight=1.0, color_weight=1.0):
+    def __init__(self, config):
         super(GaussianSplatLoss, self).__init__()
-        self.position_weight = position_weight
-        self.scaling_weight = scaling_weight
-        self.rotation_weight = rotation_weight
-        self.opacity_weight = opacity_weight
-        self.color_weight = color_weight
+        self.position_lossFn = loss_functions[config['loss_function']['position_loss']]
+        self.scaling_lossFn = loss_functions[config['loss_function']['scaling_loss']]
+        self.rotation_lossFn = loss_functions[config['loss_function']['rotation_loss']]
+        self.opacity_lossFn = loss_functions[config['loss_function']['opacity_loss']]
+        self.color_lossFn = loss_functions[config['loss_function']['color_loss']]
+        
+        self.position_weight = config['loss_weights']['position_weight']
+        self.scaling_weight = config['loss_weights']['scaling_weight']
+        self.rotation_weight = config['loss_weights']['rotation_weight']
+        self.opacity_weight = config['loss_weights']['opacity_weight']
+        self.color_weight = config['loss_weights']['color_weight']
 
-    def forward(self, pred, target):
-        # print('Loss pred shape: ', pred.shape)
-        # print('Loss target shape: ', target.shape)
-        position_loss = F.mse_loss(pred[:,:3], target[:,:3])
-        scaling_loss = F.mse_loss(pred[:,10:13], target[:,10:13])
-        rotation_loss = F.mse_loss(pred[:,13:], target[:,13:])
-        opacity_loss = F.mse_loss(pred[:,9], target[:,9])
-        color_loss = F.mse_loss(pred[:,6:9], target[:,6:9])
+    def forward(self, pred:torch.Tensor, target:torch.Tensor):
+        pred = pred.transpose(1, 0)
+        target = target.transpose(1, 0)
+
+        position_loss = self.position_lossFn(pred[:3,:], target[:3,:])
+        scaling_loss = self.scaling_lossFn(pred[10:13,:], target[10:13,:])
+        rotation_loss = self.rotation_lossFn(pred[13:,:], target[13:,:])
+        opacity_loss = self.opacity_lossFn(pred[9,:], target[9,:])
+        color_loss = self.color_lossFn(pred[6:9,:], target[6:9,:])
 
         total_loss = position_loss * self.position_weight + scaling_loss * self.scaling_weight + rotation_loss * self.rotation_weight + opacity_loss * self.opacity_weight + color_loss * self.color_weight
         return total_loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss

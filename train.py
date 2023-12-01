@@ -14,6 +14,7 @@ from tqdm import tqdm
 import numpy as np
 import wandb
 import time
+from config import Config
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
@@ -103,6 +104,8 @@ def main(args):
     logger.addHandler(file_handler)
     log_string('PARAMETER ...')
     log_string(args)
+    log_string('Device : %s' % device)
+    log_string(f'Config : {Config}')
 
     root = 'data/preprocessed'
     NUM_CLASSES = 13
@@ -128,7 +131,7 @@ def main(args):
     # shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
 
     model = Mesh2Splat(17).to(device)
-    criterion = GaussianSplatLoss()
+    criterion = GaussianSplatLoss(config = Config)
     # classifier.apply(inplace_relu)
 
     # def weights_init(m):
