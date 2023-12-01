@@ -204,8 +204,6 @@ def main(args):
             target = torch.Tensor(target).float().to(device)
 
             pred, _ = model(points)
-            pred = pred.reshape(-1, 17)
-            target = target.reshape(-1, 17)
             loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss = criterion(pred, target)
             loss.backward()
             optimizer.step()
