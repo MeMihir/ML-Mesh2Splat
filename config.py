@@ -7,7 +7,7 @@ Config = {
         'color_weight': 1.0        
     },
     'loss_function': {
-        'position_loss': 'mse',
+        'position_loss': 'chamfer',
         'scaling_loss': 'mse',
         'rotation_loss': 'mse',
         'opacity_loss': 'mse',

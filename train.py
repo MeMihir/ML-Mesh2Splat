@@ -255,7 +255,10 @@ def main(args):
         preds, _ = model(points)
         preds = preds.cpu().detach().numpy()
         for pred in preds:
-            postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i) + '.ply'))
+            postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i)))
+    
+    if args.report_to_wandb and args.save_checkpoints_to_wandb:
+        wandb.save(args.output_dir)
 
 if __name__ == '__main__':
     args = parse_args()

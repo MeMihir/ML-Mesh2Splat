@@ -33,12 +33,16 @@ def save_numpy_array_to_ply(numpy_array, file_path):
     vertex_element = PlyElement.describe(structured_array, 'vertex')
 
     # Save the PLY file
-    with open(file_path, 'wb') as f:
+    with open(file_path+'.ply', 'wb') as f:
         PlyData([vertex_element], text=False, byte_order='<').write(f)
+    
+    # Save the numpy array
+    np.save(file_path+'.npy', numpy_array)
 
 def test():
     array = np.load("data/preprocessed/train/anya_splat.npy")
-    save_numpy_array_to_ply(array, "data/output/anya.ply")
+    array=array.transpose(1, 0)
+    save_numpy_array_to_ply(array, "data/output/anya")
 
 if __name__ == "__main__":
     test()
