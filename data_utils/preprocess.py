@@ -52,6 +52,11 @@ def data_to_obj(data,name='example.obj',no_wall=True):
     fout.close()
 
 def preprocess_data(split_ratio=0.9, num_point=4096):
+    # check if processed data exists
+    if len(os.listdir(os.path.join(preprop_path))) > 0:
+        print('preprocessed data found, skipping preprocessing')
+        return
+
     filenames = [os.path.splitext(filename)[0] for filename in os.listdir(input_path)]
     np.random.shuffle(filenames)
     train_files = filenames[:int(len(filenames)*split_ratio)]
