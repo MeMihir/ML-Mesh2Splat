@@ -77,8 +77,8 @@ class GaussianSplatLoss(nn.Module):
         opacity_loss = self.opacity_lossFn(pred[:,9], target[:,9])
         color_loss = self.color_lossFn(pred[:,6:9], target[:,6:9])
 
-        total_loss = position_loss[0] * self.position_weight + scaling_loss * self.scaling_weight + rotation_loss * self.rotation_weight + opacity_loss * self.opacity_weight + color_loss * self.color_weight
-        return total_loss, position_loss[0], scaling_loss, rotation_loss, opacity_loss, color_loss
+        total_loss = position_loss * self.position_weight + scaling_loss * self.scaling_weight + rotation_loss * self.rotation_weight + opacity_loss * self.opacity_weight + color_loss * self.color_weight
+        return total_loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss
 
 if __name__ == '__main__':
     model = Mesh2Splat(13)
