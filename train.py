@@ -254,6 +254,7 @@ def main(args):
         points = torch.Tensor(points).float().to(device)
         preds, _ = model(points)
         preds = preds.cpu().detach().numpy()
+        points = points.cpu().detach().numpy()
         pred_points = np.concatenate([points[:,:6], preds], axis=1)
         for pred in pred_points:
             postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i)))
