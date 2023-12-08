@@ -42,8 +42,8 @@ class MeshSplatDataset(Dataset):
         print('The size of %s data is %d' % (self.split, len(self.points)))
     
     def __getitem__(self, index):
-        points = torch.Tensor(self.points[index]).to(self.device)
-        splats = torch.Tensor(self.splats[index]).to(self.device)
+        points = self.points[index]
+        splats = self.splats[index]
         if self.transform is not None:
             points, splats = self.transform(points, splats)
         return points, splats

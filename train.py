@@ -1,7 +1,7 @@
 import argparse
 import os
 from data_utils.MeshSplatDataset import MeshSplatDataset
-from data_utils import preprocess
+from data_utils import preprocess, postprocessing
 from model.mesh2splat import Mesh2Splat, GaussianSplatLoss
 import torch
 import datetime
@@ -14,6 +14,7 @@ from tqdm import tqdm
 import numpy as np
 import wandb
 import time
+from config import Config
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = BASE_DIR
@@ -34,6 +35,7 @@ def parse_args():
     parser.add_argument('--device', type=str, default=None, help='GPU to use [default: none]')
     parser.add_argument('--optimizer', type=str, default='Adam', help='Adam or SGD [default: Adam]')
     parser.add_argument('--log_dir', type=str, default=None, help='Log path [default: None]')
+    parser.add_argument('--output_dir', type=str, default='./data/output', help='Log path [default: None]')
     parser.add_argument('--decay_rate', type=float, default=1e-4, help='weight decay [default: 1e-4]')
     parser.add_argument('--npoint', type=int, default=16384, help='Point Number [default: 16384]')
     parser.add_argument('--step_size', type=int, default=10, help='Decay step for lr decay [default: every 10 epochs]')
@@ -88,6 +90,8 @@ def main(args):
     checkpoints_dir.mkdir(exist_ok=True)
     log_dir = experiment_dir.joinpath('logs/')
     log_dir.mkdir(exist_ok=True)
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(exist_ok=True)
 
     '''LOG'''
     args = parse_args()
@@ -100,6 +104,8 @@ def main(args):
     logger.addHandler(file_handler)
     log_string('PARAMETER ...')
     log_string(args)
+    log_string('Device : %s' % device)
+    log_string(f'Config : {Config}')
 
     root = 'data/preprocessed'
     NUM_CLASSES = 13
@@ -124,8 +130,8 @@ def main(args):
     # shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     # shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
 
-    model = Mesh2Splat(17)
-    criterion = GaussianSplatLoss()
+    model = Mesh2Splat(17).to(device)
+    criterion = GaussianSplatLoss(config = Config)
     # classifier.apply(inplace_relu)
 
     # def weights_init(m):
@@ -141,7 +147,7 @@ def main(args):
         print(os.path.join(checkpoints_dir, args.model + '.pth'))
         checkpoint = torch.load(os.path.join(checkpoints_dir, args.model + '.pth'), map_location=device)
         start_epoch = checkpoint['epoch']
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict'], strict=False)
         log_string('Use pretrain model')
     except Exception as e:
         print(e)
@@ -194,11 +200,11 @@ def main(args):
             optimizer.zero_grad()
 
             # points = points.transpose(2, 1)
+            points = torch.Tensor(points).float().to(device)
+            target = torch.Tensor(target).float().to(device)
 
             pred, _ = model(points)
-            pred = pred.reshape(-1, 17)
-            target = target.reshape(-1, 17)
-            loss = criterion(pred, target)
+            loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss = criterion(pred, target)
             loss.backward()
             optimizer.step()
 
@@ -209,14 +215,18 @@ def main(args):
             loss_sum += loss
 
             if args.report_to_wandb: 
-                print("Logging to wandb")
                 wandb.log({
                     "lr": optimizer.param_groups[0]["lr"], 
-                    "mean_loss": (loss_sum / num_batches),
-                    "loss": loss
+                    "loss": loss,
+                    "position_loss": position_loss,
+                    "scaling_loss": scaling_loss,
+                    "rotation_loss": rotation_loss,
+                    "opacity_loss": opacity_loss,
+                    "color_loss": color_loss,
                     },commit=True
                 )
         log_string('Training mean loss: %f' % (loss_sum / num_batches))
+        log_string('Training loss: %f' % loss)
         # log_string('Training accuracy: %f' % (total_correct / float(total_seen)))
 
         if epoch % 5 == 0:
@@ -235,6 +245,20 @@ def main(args):
                 wandb.save(f"{args.run_name}/checkpoint_{epoch}.pt")
         global_epoch += 1
 
+    if args.report_to_wandb and args.save_checkpoints_to_wandb:
+        wandb.save(f"{args.run_name}/checkpoint_{args.epoch}.pt")
+
+    # Get output
+    model = model.eval()
+    for i, (points, target) in tqdm(enumerate(trainDataLoader), total=len(trainDataLoader), smoothing=0.9):
+        points = torch.Tensor(points).float().to(device)
+        preds, _ = model(points)
+        preds = preds.cpu().detach().numpy()
+        for pred in preds:
+            postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i)))
+    
+    if args.report_to_wandb and args.save_checkpoints_to_wandb:
+        wandb.save(args.output_dir)
 
 if __name__ == '__main__':
     args = parse_args()
