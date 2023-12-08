@@ -78,11 +78,13 @@ class GaussianSplatLoss(nn.Module):
         # opacity_loss = self.opacity_lossFn(pred[:,9], target[:,9])
         # color_loss = self.color_lossFn(pred[:,6:9], target[:,6:9])
         
-        pred.transpose(1,2)
-        target.transpose(1,2)
+        pred = pred.transpose(1,2)
+        target = target.transpose(1,2)
+        print(pred.shape)
         B,N,D = pred.shape
-        pred.reshape(B*N, D)
-        target.reshape(B*N, D)
+        pred = pred.reshape(B*N, D)
+        target = target.reshape(B*N, D)
+        print(pred.shape)
 
         scaling_loss = self.scaling_lossFn(pred[:,4:7], target[:,4:7])
         rotation_loss = self.rotation_lossFn(pred[:,7:], target[:,7:])
