@@ -255,7 +255,8 @@ def main(args):
         preds, _ = model(points)
         preds = preds.cpu().detach().numpy()
         points = points.cpu().detach().numpy()
-        pred_points = np.concatenate([points[:,:6], preds], axis=1)
+        batch, dim, num = points.shape
+        pred_points = np.concatenate([points[:,:3,:], np.zeros((batch, 3, num)), preds], axis=1)
         for pred in pred_points:
             postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i)))
     

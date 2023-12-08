@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -67,7 +68,7 @@ class GaussianSplatLoss(nn.Module):
         self.opacity_weight = config['loss_weights']['opacity_weight']
         self.color_weight = config['loss_weights']['color_weight']
 
-    def forward(self, pred, target):
+    def forward(self, pred:np.ndarray, target:np.ndarray):
         # print('Loss pred shape: ', pred.shape)
         # print('Loss target shape: ', target.shape)
 
@@ -77,12 +78,18 @@ class GaussianSplatLoss(nn.Module):
         # opacity_loss = self.opacity_lossFn(pred[:,9], target[:,9])
         # color_loss = self.color_lossFn(pred[:,6:9], target[:,6:9])
         
+        pred.transpose(1,2)
+        target.transpose(1,2)
+        B,N,D = pred.shape
+        pred.reshape(B*N, D)
+        target.reshape(B*N, D)
+
         scaling_loss = self.scaling_lossFn(pred[:,4:7], target[:,4:7])
         rotation_loss = self.rotation_lossFn(pred[:,7:], target[:,7:])
         opacity_loss = self.opacity_lossFn(pred[:,3], target[:,3])
         color_loss = self.color_lossFn(pred[:,:3], target[:,:3])
 
-        total_loss = self.position_weight + scaling_loss * self.scaling_weight + rotation_loss * self.rotation_weight + opacity_loss * self.opacity_weight + color_loss * self.color_weight
+        total_loss = F.mse_loss(pred, target)
         return total_loss, 0, scaling_loss, rotation_loss, opacity_loss, color_loss
 
 if __name__ == '__main__':
