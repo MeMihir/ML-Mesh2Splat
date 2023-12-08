@@ -1,9 +1,15 @@
 import numpy as np
 from plyfile import PlyData, PlyElement
 
-def save_numpy_array_to_ply(numpy_array, file_path):
-    num_vertices = numpy_array.shape[1]
-    numpy_array = numpy_array.reshape(num_vertices, 17)
+def save_numpy_array_to_ply(numpy_array:np.ndarray, file_path:str):
+    print(numpy_array.shape)
+    numpy_array = numpy_array.transpose(1,0)
+    print(numpy_array.shape)
+    print(numpy_array[0,:])
+    
+    # Save the numpy array
+    np.save(file_path+'.npy', numpy_array)
+
 
     # Define the structured array with field names and data types
     dtype = np.dtype([
@@ -36,8 +42,6 @@ def save_numpy_array_to_ply(numpy_array, file_path):
     with open(file_path+'.ply', 'wb') as f:
         PlyData([vertex_element], text=False, byte_order='<').write(f)
     
-    # Save the numpy array
-    np.save(file_path+'.npy', numpy_array)
 
 def test():
     array = np.load("data/preprocessed/train/anya_splat.npy")
