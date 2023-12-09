@@ -130,7 +130,7 @@ def main(args):
     # shutil.copy('models/%s.py' % args.model, str(experiment_dir))
     # shutil.copy('models/pointnet2_utils.py', str(experiment_dir))
 
-    model = Mesh2Splat(17).to(device)
+    model = Mesh2Splat(11).to(device)
     criterion = GaussianSplatLoss(config = Config)
     # classifier.apply(inplace_relu)
 
@@ -204,7 +204,7 @@ def main(args):
             target = torch.Tensor(target).float().to(device)
 
             pred, _ = model(points)
-            loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss = criterion(pred, target)
+            loss, position_loss, scaling_loss, rotation_loss, opacity_loss, color_loss = criterion(pred, target[:,6:])
             loss.backward()
             optimizer.step()
 
@@ -254,8 +254,11 @@ def main(args):
         points = torch.Tensor(points).float().to(device)
         preds, _ = model(points)
         preds = preds.cpu().detach().numpy()
-        for pred in preds:
-            postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, str(i)))
+        points = points.cpu().detach().numpy()
+        batch, dim, num = points.shape
+        pred_points = np.concatenate([points[:,:3,:], np.zeros((batch, 3, num)), preds], axis=1)
+        for j, pred in enumerate(pred_points):
+            postprocessing.save_numpy_array_to_ply(pred, os.path.join(args.output_dir, f"{i}_{j}"))
     
     if args.report_to_wandb and args.save_checkpoints_to_wandb:
         wandb.save(args.output_dir)
